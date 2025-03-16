@@ -1,5 +1,5 @@
 # Kyber-PQC Build Automation
-PYTHON := python3
+PYTHON := python
 PIP := pip3
 
 .PHONY: all install build test lint profile clean
