@@ -1,0 +1,23 @@
+# Security
+*.key
+*.pem
+*.cert
+
+# Build artifacts
+__pycache__/
+*.so
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Development
+.venv/
+.env
+.vscode/
+
+# Testing
+.coverage
+htmlcov/

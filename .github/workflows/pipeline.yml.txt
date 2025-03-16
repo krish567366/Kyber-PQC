@@ -1,0 +1,12 @@
+# .github/workflows/pipeline.yml
+name: Security Hardened Pipeline
+on: [push, pull_request]
+
+jobs:
+  verification:
+    runs-on: [self-hosted, secure]
+    steps:
+      - name: Cryptographic Validation
+        uses: nist-pqc/actions/verify-kyber@v1
+      - name: Side-Channel Analysis
+        uses: chipwhisperer/action-power-analysis@main
