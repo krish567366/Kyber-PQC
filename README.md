@@ -1,6 +1,6 @@
 # Kyber-PQC: Quantum-Resistant Cryptography Implementation
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/yourorg/kyber-pqc/ci.yml?branch=main)](https://github.com/yourorg/kyber-pqc/actions)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/yourorg/kyber-pqc/ci.yml?branch=main)](https://github.com/krish567366/Kyber-POC/actions)
 [![Coverage](https://img.shields.io/codecov/c/github/yourorg/kyber-pqc)](https://codecov.io/gh/yourorg/kyber-pqc)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
