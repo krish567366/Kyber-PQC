@@ -31,7 +31,7 @@ setup(
         Extension(
             "kyber_pqc._native",
             sources=NATIVE_SOURCES,
-            include_dirs=["c/include", "c/vendor/kyber512"],
+            include_dirs=["c/include", "c/src", "c/vendor/kyber512"],
             define_macros=[("KYBER_K", "2")],
             extra_compile_args=extra_compile_args,
         )

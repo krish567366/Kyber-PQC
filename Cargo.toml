@@ -1,0 +1,18 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/kyber-pqc-sys",
+    "crates/kyber-pqc",
+]
+
+[workspace.package]
+version = "2.0.0"
+edition = "2021"
+license = "MIT"
+authors = ["Bajpai Labs <hello@bajpailabs.com>"]
+homepage = "https://quantum.postquantumlabs.in/kyber-pqc"
+documentation = "https://quantum.postquantumlabs.in/docs/kyber-pqc"
+repository = "https://github.com/krish567366/Kyber-PQC"
+description = "Native ML-KEM-512 (Kyber-512) post-quantum key encapsulation"
+keywords = ["kyber", "post-quantum", "cryptography", "ml-kem", "kem"]
+categories = ["cryptography", "no-std"]

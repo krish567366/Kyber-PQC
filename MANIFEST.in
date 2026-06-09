@@ -1,0 +1,12 @@
+include LICENSE
+include README.md
+include setup.py
+
+recursive-include c/include *.h
+recursive-include c/src *.c
+recursive-include c/src *.h
+recursive-include c/vendor/kyber512 *.c
+recursive-include c/vendor/kyber512 *.h
+
+prune src/kyber_pqc.egg-info
+global-exclude *.egg-info

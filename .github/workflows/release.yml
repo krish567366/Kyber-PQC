@@ -1,38 +1,401 @@
-name: Publish Python distributions to PyPI
+name: Release
 
 on:
+  push:
+    tags:
+      - "v*"
   release:
-    types: [created]
+    types: [published]
+
+permissions:
+  contents: write
+  packages: write
 
 jobs:
-  build-n-publish:
-    name: Build and publish kyber-pqc to PyPI
+  test:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Python tests
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]" build twine
+          pip install -e ".[dev]"
+          pytest src/tests/
 
-      - name: Test
-        run: python -m pytest src/tests/
+      - name: C / CMake tests
+        run: |
+          cmake -S c -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+          ctest --test-dir build || true
+          make -C c test
 
-      - name: Build Distribution Files
-        run: python -m build --sdist --wheel --outdir dist/
+      - name: Go tests
+        run: |
+          make -C c lib
+          cd go && CGO_ENABLED=1 go test ./...
 
-      - name: Verify Package with Twine
-        run: twine check dist/*
+      - name: Rust tests
+        run: cargo test --workspace
+
+      - name: Conan package
+        run: |
+          pip install conan
+          conan profile detect --force
+          conan create . --build=missing
+
+  build-assets:
+    needs: test
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build native library and CLI
+        run: |
+          cmake -S c -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPROJECT_VERSION=${GITHUB_REF_NAME#v}
+          cmake --build build
+          cmake --install build --prefix dist/${{ matrix.target }}
+
+      - name: Archive release artifacts
+        run: |
+          cd dist/${{ matrix.target }}
+          tar -czf ../../kyber-pqc-${GITHUB_REF_NAME}-${{ matrix.target }}.tar.gz .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kyber-pqc-${{ matrix.target }}
+          path: dist/kyber-pqc-${GITHUB_REF_NAME}-${{ matrix.target }}.tar.gz
+
+  github-release:
+    needs: build-assets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.tar.gz
+          generate_release_notes: true
+
+  homebrew-tap:
+    name: Homebrew tap + bottle
+    needs: github-release
+    runs-on: macos-latest
+    env:
+      HOMEBREW_TAP_REPO: bajpailabs/homebrew-tap
+      HOMEBREW_NO_INSTALL_CLEANUP: 1
+      HOMEBREW_NO_AUTO_UPDATE: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update Homebrew formula
+        env:
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          URL="https://github.com/${REPO}/archive/refs/tags/${TAG}.tar.gz"
+          SHA256=$(curl -fsSL "${URL}" | shasum -a 256 | awk '{print $1}')
+          FORMULA="homebrew-tap/Formula/kyber-pqc.rb"
+          sed -i '' "s|url \".*\"|url \"${URL}\"|" "${FORMULA}"
+          sed -i '' "s/sha256 \".*\"/sha256 \"${SHA256}\"/" "${FORMULA}"
+
+      - name: Build and bottle kyber-pqc
+        env:
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          FORMULA="${GITHUB_WORKSPACE}/homebrew-tap/Formula/kyber-pqc.rb"
+          ROOT_URL="https://github.com/${REPO}/releases/download/${TAG}"
+          brew install --build-bottle --formula "${FORMULA}"
+          brew bottle --json --root-url="${ROOT_URL}" kyber-pqc > bottle.json
+          brew bottle --merge --write bottle.json
+
+      - name: Upload bottle to GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          shopt -s nullglob
+          bottles=(kyber-pqc--*.bottle.tar.gz)
+          if ((${#bottles[@]} > 0)); then
+            gh release upload "${{ github.ref_name }}" "${bottles[@]}" --clobber
+          fi
+
+      - name: Push formula to bajpailabs/homebrew-tap
+        if: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN != '' }}
+        env:
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          VERSION="${TAG#v}"
+          git clone "https://x-access-token:${HOMEBREW_TAP_GITHUB_TOKEN}@github.com/${HOMEBREW_TAP_REPO}.git" tap
+          mkdir -p tap/Formula
+          cp homebrew-tap/Formula/kyber-pqc.rb tap/Formula/kyber-pqc.rb
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/kyber-pqc.rb
+          git diff --staged --quiet || git commit -m "kyber-pqc ${VERSION}"
+          git push
+
+      - name: Commit formula mirror in main repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          cp homebrew-tap/Formula/kyber-pqc.rb Formula/kyber-pqc.rb
+          git add Formula/kyber-pqc.rb homebrew-tap/Formula/kyber-pqc.rb
+          git diff --staged --quiet || git commit -m "chore(homebrew): update formula for ${{ github.ref_name }}"
+          git push || true
+
+  pypi:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build Python distributions
+        run: |
+          pip install build twine
+          python -m build
+          twine check dist/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-dist
+          path: dist/*
 
       - name: Publish to PyPI
+        if: ${{ secrets.PYPI_API_TOKEN != '' }}
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
+
+  crates-io:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish kyber-pqc-sys
+        if: ${{ secrets.CRATES_IO_TOKEN != '' }}
+        working-directory: crates/kyber-pqc-sys
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: cargo publish --allow-dirty --token "$CARGO_REGISTRY_TOKEN"
+
+      - name: Publish kyber-pqc
+        if: ${{ secrets.CRATES_IO_TOKEN != '' }}
+        working-directory: crates/kyber-pqc
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: sleep 30 && cargo publish --allow-dirty --token "$CARGO_REGISTRY_TOKEN"
+
+  bajpai-conan:
+    name: Conan (${{ matrix.arch }})
+    needs: test
+    if: ${{ secrets.BAJPAILABS_REGISTRY_USER != '' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: linux-x86_64
+          - os: ubuntu-24.04-arm
+            arch: linux-arm64
+          - os: macos-latest
+            arch: macos-arm64
+          - os: windows-latest
+            arch: windows-x86_64
+    env:
+      CONAN_URL: https://conan.bajpailabs.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Conan
+        run: pip install conan
+
+      - name: Detect Conan profile
+        run: conan profile detect --force
+
+      - name: Create and upload Conan package
+        shell: bash
+        env:
+          BAJPAILABS_REGISTRY_USER: ${{ secrets.BAJPAILABS_REGISTRY_USER }}
+          BAJPAILABS_REGISTRY_PASSWORD: ${{ secrets.BAJPAILABS_REGISTRY_PASSWORD }}
+        run: |
+          conan remote add bajpai "${CONAN_URL}" --force
+          conan remote login bajpai "${BAJPAILABS_REGISTRY_USER}" \
+            -p "${BAJPAILABS_REGISTRY_PASSWORD}"
+          conan create . --build=missing -s build_type=Release
+          conan upload "kyber-pqc/*" -r bajpai --all --confirm
+
+  bajpai-docker:
+    needs: test
+    if: ${{ secrets.BAJPAILABS_REGISTRY_USER != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Bajpai Docker registry
+        uses: docker/login-action@v3
+        with:
+          registry: docker.bajpailabs.com
+          username: ${{ secrets.BAJPAILABS_REGISTRY_USER }}
+          password: ${{ secrets.BAJPAILABS_REGISTRY_PASSWORD }}
+
+      - name: Build and push container image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            docker.bajpailabs.com/kyber-pqc:latest
+            docker.bajpailabs.com/kyber-pqc:${{ github.ref_name }}
+
+  bajpai-raw:
+    needs: [build-assets, pypi, github-release]
+    if: ${{ secrets.BAJPAILABS_REGISTRY_USER != '' }}
+    runs-on: ubuntu-latest
+    env:
+      RAW_URL: https://raw.bajpailabs.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: dist/python
+        continue-on-error: true
+
+      - name: Install Syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
+            | sh -s -- -b /usr/local/bin
+
+      - name: Generate SBOM (SPDX)
+        run: syft . -o spdx-json > sbom.spdx.json
+
+      - name: Generate SBOM (CycloneDX)
+        run: syft . -o cyclonedx-json > cyclonedx.json
+
+      - name: Install minisign
+        if: ${{ secrets.MINISIGN_KEY != '' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y minisign
+
+      - name: Sign release tarballs
+        if: ${{ secrets.MINISIGN_KEY != '' }}
+        env:
+          MINISIGN_KEY: ${{ secrets.MINISIGN_KEY }}
+          MINISIGN_PASSWORD: ${{ secrets.MINISIGN_PASSWORD }}
+        run: |
+          printf '%s' "${MINISIGN_KEY}" > minisign.key
+          chmod 600 minisign.key
+          shopt -s nullglob
+          for tarball in dist/*.tar.gz; do
+            if [[ -n "${MINISIGN_PASSWORD}" ]]; then
+              printf '%s\n' "${MINISIGN_PASSWORD}" | minisign -S \
+                -m "${tarball}" \
+                -s minisign.key \
+                -p minisign.pub \
+                -x "${tarball}.sig"
+            else
+              minisign -S \
+                -m "${tarball}" \
+                -s minisign.key \
+                -p minisign.pub \
+                -x "${tarball}.sig"
+            fi
+            echo "signed $(basename "${tarball}")"
+          done
+          rm -f minisign.key
+
+      - name: Generate SHA256SUMS
+        run: |
+          shopt -s nullglob
+          (cd dist && sha256sum *.tar.gz > SHA256SUMS)
+
+      - name: Upload to Raw registry
+        env:
+          BAJPAILABS_REGISTRY_USER: ${{ secrets.BAJPAILABS_REGISTRY_USER }}
+          BAJPAILABS_REGISTRY_PASSWORD: ${{ secrets.BAJPAILABS_REGISTRY_PASSWORD }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          BASE="${RAW_URL}/kyber-pqc/${TAG}"
+          shopt -s nullglob
+          upload() {
+            local file="$1"
+            local name
+            name="$(basename "${file}")"
+            curl -fsS \
+              -u "${BAJPAILABS_REGISTRY_USER}:${BAJPAILABS_REGISTRY_PASSWORD}" \
+              --upload-file "${file}" \
+              "${BASE}/${name}"
+            echo "uploaded ${name}"
+          }
+          for tarball in dist/*.tar.gz; do
+            upload "${tarball}"
+            [[ -f "${tarball}.sig" ]] && upload "${tarball}.sig"
+          done
+          upload dist/SHA256SUMS
+          upload sbom.spdx.json
+          upload cyclonedx.json
+          for wheel in dist/python/*; do
+            [[ -f "${wheel}" ]] && upload "${wheel}"
+          done
+
+      - name: Upload SBOM and signatures to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          shopt -s nullglob
+          files=(sbom.spdx.json cyclonedx.json dist/SHA256SUMS dist/*.tar.gz.sig)
+          existing=()
+          for file in "${files[@]}"; do
+            [[ -f "${file}" ]] && existing+=("${file}")
+          done
+          if ((${#existing[@]} > 0)); then
+            gh release upload "${{ github.ref_name }}" "${existing[@]}" --clobber
+          fi

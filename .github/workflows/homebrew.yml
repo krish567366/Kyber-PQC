@@ -1,0 +1,37 @@
+name: Homebrew
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Formula/**"
+      - "homebrew-tap/**"
+      - "c/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "Formula/**"
+      - "homebrew-tap/**"
+      - "c/**"
+
+jobs:
+  formula-build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and test (same steps as Formula)
+        run: |
+          cmake -S c -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPROJECT_VERSION=2.0.0
+          cmake --build build
+          ./build/kyber-pqc version
+          ./build/kyber-pqc keygen public.hex.pem private.hex.pem
+          test -f public.hex.pem
+          test -f private.hex.pem
+
+      - name: Audit formula syntax
+        run: |
+          brew style Formula/kyber-pqc.rb
+          brew style homebrew-tap/Formula/kyber-pqc.rb

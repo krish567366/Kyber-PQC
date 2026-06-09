@@ -4,16 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kyber-pqc"
-version = "1.0.0"
+version = "2.0.0"
 description = "Native high-performance ML-KEM-512 (Kyber-512) implementation"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = "MIT"
 authors = [{name = "Bajpai Labs", email = "hello@bajpailabs.com"}]
 keywords = ["post-quantum", "cryptography", "kyber", "security", "ml-kem"]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Topic :: Security :: Cryptography"
 ]
@@ -35,8 +34,13 @@ Homepage = "https://quantum.postquantumlabs.in/kyber-pqc"
 Documentation = "https://quantum.postquantumlabs.in/docs/kyber-pqc"
 Repository = "https://github.com/krish567366/Kyber-PQC"
 
+[tool.setuptools]
+include-package-data = true
+
 [tool.setuptools.packages.find]
 where = ["src"]
+include = ["kyber_pqc*"]
+exclude = ["tests*"]
 
 [tool.pytest.ini_options]
 testpaths = ["src/tests"]

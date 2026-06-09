@@ -18,8 +18,20 @@ src/kyber_pqc/_native*.pyd
 *.pyo
 *.pyd
 *.egg-info/
+src/kyber_pqc.egg-info/
 dist/
 build/
+
+# Conan
+test_package/build/
+test_package/CMakeUserPresets.json
+
+# Rust
+/target/
+Cargo.lock
+
+# CMake
+/c/build/
 
 # Development
 .venv/
