@@ -5,7 +5,7 @@
 #include "kyber_pqc.h"
 
 #ifndef KYBER_PQC_VERSION
-#define KYBER_PQC_VERSION "2.0.0"
+#define KYBER_PQC_VERSION "2.1.1"
 #endif
 
 static void print_usage(const char *program)

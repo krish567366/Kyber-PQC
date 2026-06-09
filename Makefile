@@ -62,7 +62,7 @@ docker-push-bajpai: docker-build
 	docker push $(DOCKER_REGISTRY)/kyber-pqc:latest
 
 brew-test:
-	cmake -S c -B c/build -DCMAKE_BUILD_TYPE=Release -DPROJECT_VERSION=2.0.0
+	cmake -S c -B c/build -DCMAKE_BUILD_TYPE=Release -DPROJECT_VERSION=2.1.1
 	cmake --build c/build
 	./c/build/kyber-pqc version
 	brew style Formula/kyber-pqc.rb

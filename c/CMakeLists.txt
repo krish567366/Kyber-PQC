@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 
 if(NOT DEFINED PROJECT_VERSION)
-    set(PROJECT_VERSION "2.0.0")
+    set(PROJECT_VERSION "2.1.1")
 endif()
 
 project(kyber-pqc VERSION ${PROJECT_VERSION} LANGUAGES C)

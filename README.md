@@ -16,10 +16,10 @@ pip install kyber-pqc
 | Channel | Install |
 |---------|---------|
 | PyPI | `pip install kyber-pqc` |
-| Conan | `conan install kyber-pqc/2.0.0 -r bajpai` |
+| Conan | `conan install kyber-pqc/2.1.1 -r bajpai` |
 | Docker | `docker pull docker.bajpailabs.com/kyber-pqc:latest` |
-| Raw | `raw.bajpailabs.com/kyber-pqc/v2.0.0/…` |
-| Go | `go get github.com/krish567366/Kyber-PQC/go/kyberpqc@v2.0.0` |
+| Raw | `raw.bajpailabs.com/kyber-pqc/v2.1.1/…` |
+| Go | `go get github.com/krish567366/Kyber-PQC/go/kyberpqc@v2.1.1` |
 | Rust | `cargo add kyber-pqc` |
 | Homebrew | `brew tap bajpai-labs/tap && brew install kyber-pqc` |
 
@@ -45,8 +45,8 @@ make test
 ## Release
 
 ```bash
-git tag v2.0.0
-git push origin v2.0.0
+git tag v2.1.1
+git push origin v2.1.1
 ```
 
 GitHub secrets: `BAJPAILABS_REGISTRY_USER`, `BAJPAILABS_REGISTRY_PASSWORD`, `CRATES_IO_TOKEN`, `PYPI_API_TOKEN` (optional), `MINISIGN_KEY`, `MINISIGN_PASSWORD` (optional), `HOMEBREW_TAP_GITHUB_TOKEN` (pushes formula to [bajpai-labs/homebrew-tap](https://github.com/bajpai-labs/homebrew-tap)).
@@ -76,9 +76,9 @@ Commit `minisign.pub` to this repo. Add GitHub Actions secrets:
 Verify a release tarball:
 
 ```bash
-minisign -Vm kyber-pqc-v2.0.0-x86_64-unknown-linux-gnu.tar.gz -p minisign.pub
+minisign -Vm kyber-pqc-v2.1.1-x86_64-unknown-linux-gnu.tar.gz -p minisign.pub
 # or
-minisign -V kyber-pqc-v2.0.0-x86_64-unknown-linux-gnu.tar.gz -p minisign.pub
+minisign -V kyber-pqc-v2.1.1-x86_64-unknown-linux-gnu.tar.gz -p minisign.pub
 ```
 
 ## License

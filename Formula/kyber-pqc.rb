@@ -2,7 +2,7 @@ class KyberPqc < Formula
   desc "Native ML-KEM-512 (Kyber-512) post-quantum key encapsulation"
   homepage "https://quantum.postquantumlabs.in/kyber-pqc"
   # Mirrored from homebrew-tap/Formula/kyber-pqc.rb (updated on each release).
-  url "https://github.com/krish567366/Kyber-PQC/archive/refs/tags/v2.0.0.tar.gz"
+  url "https://github.com/krish567366/Kyber-PQC/archive/refs/tags/v2.1.1.tar.gz"
   sha256 "UPDATE_ON_RELEASE"
   license "MIT"
   head "https://github.com/krish567366/Kyber-PQC.git", branch: "main"

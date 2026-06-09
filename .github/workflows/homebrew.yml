@@ -24,7 +24,7 @@ jobs:
         run: |
           cmake -S c -B build \
             -DCMAKE_BUILD_TYPE=Release \
-            -DPROJECT_VERSION=2.0.0
+            -DPROJECT_VERSION=2.1.1
           cmake --build build
           ./build/kyber-pqc version
           ./build/kyber-pqc keygen public.hex.pem private.hex.pem
