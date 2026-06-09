@@ -49,7 +49,7 @@ git tag v2.1.1
 git push origin v2.1.1
 ```
 
-GitHub secrets: `BAJPAILABS_REGISTRY_USER`, `BAJPAILABS_REGISTRY_PASSWORD`, `CRATES_IO_TOKEN`, `PYPI_API_TOKEN` (optional), `MINISIGN_KEY`, `MINISIGN_PASSWORD` (optional), `HOMEBREW_TAP_GITHUB_TOKEN` (pushes formula to [bajpai-labs/homebrew-tap](https://github.com/bajpai-labs/homebrew-tap)).
+GitHub secrets: `BAJPAILABS_REGISTRY_USER`, `BAJPAILABS_REGISTRY_PASSWORD`, `CRATES_IO_TOKEN`, `PYPI_API_TOKEN` (optional), `MINISIGN_KEY`, `MINISIGN_PASSWORD` (optional), `HOMEBREW_TAP_GITHUB_TOKEN` (pushes formula to [bajpai-labs/homebrew-tap](https://github.com/bajpai-labs/homebrew-tap)), `DOCS_SYNC_GITHUB_TOKEN` (syncs `docs/` to [bajpai-labs/documentation](https://github.com/bajpai-labs/documentation/tree/main/docs/kyber-pqc)).
 
 ### Homebrew
 

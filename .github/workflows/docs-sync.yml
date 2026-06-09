@@ -1,0 +1,61 @@
+name: Sync documentation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      DOCS_REPO: bajpai-labs/documentation
+      DOCS_TARGET: docs/kyber-pqc
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check documentation sync token
+        id: docs_sync
+        shell: bash
+        env:
+          DOCS_SYNC_GITHUB_TOKEN: ${{ secrets.DOCS_SYNC_GITHUB_TOKEN }}
+        run: |
+          if [[ -n "${DOCS_SYNC_GITHUB_TOKEN}" ]]; then
+            echo "enabled=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+            echo "Skipping docs sync: DOCS_SYNC_GITHUB_TOKEN not set"
+          fi
+
+      - name: Sync docs to bajpai-labs/documentation
+        if: steps.docs_sync.outputs.enabled == 'true'
+        shell: bash
+        env:
+          DOCS_SYNC_GITHUB_TOKEN: ${{ secrets.DOCS_SYNC_GITHUB_TOKEN }}
+          SOURCE_SHA: ${{ github.sha }}
+          SOURCE_REF: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [[ ! -d docs ]]; then
+            echo "No docs/ directory to sync" >&2
+            exit 1
+          fi
+          git clone "https://x-access-token:${DOCS_SYNC_GITHUB_TOKEN}@github.com/${DOCS_REPO}.git" target
+          rm -rf "target/${DOCS_TARGET}"
+          mkdir -p "target/$(dirname "${DOCS_TARGET}")"
+          cp -R docs "target/${DOCS_TARGET}"
+          cd target
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "${DOCS_TARGET}"
+          if git diff --staged --quiet; then
+            echo "Documentation already up to date"
+            exit 0
+          fi
+          git commit -m "docs(kyber-pqc): sync from Kyber-PQC ${SOURCE_REF} (${SOURCE_SHA:0:7})"
+          git push
