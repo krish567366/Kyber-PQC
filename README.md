@@ -21,7 +21,7 @@ pip install kyber-pqc
 | Raw | `raw.bajpailabs.com/kyber-pqc/v2.0.0/…` |
 | Go | `go get github.com/krish567366/Kyber-PQC/go/kyberpqc@v2.0.0` |
 | Rust | `cargo add kyber-pqc` |
-| Homebrew | `brew tap bajpailabs/tap && brew install kyber-pqc` |
+| Homebrew | `brew tap bajpai-labs/tap && brew install kyber-pqc` |
 
 Registry endpoints: `conan.bajpailabs.com` · `docker.bajpailabs.com` · `raw.bajpailabs.com`
 
@@ -49,16 +49,16 @@ git tag v2.0.0
 git push origin v2.0.0
 ```
 
-GitHub secrets: `BAJPAILABS_REGISTRY_USER`, `BAJPAILABS_REGISTRY_PASSWORD`, `CRATES_IO_TOKEN`, `PYPI_API_TOKEN` (optional), `MINISIGN_KEY`, `MINISIGN_PASSWORD` (optional), `HOMEBREW_TAP_GITHUB_TOKEN` (pushes formula to [bajpailabs/homebrew-tap](https://github.com/bajpailabs/homebrew-tap)).
+GitHub secrets: `BAJPAILABS_REGISTRY_USER`, `BAJPAILABS_REGISTRY_PASSWORD`, `CRATES_IO_TOKEN`, `PYPI_API_TOKEN` (optional), `MINISIGN_KEY`, `MINISIGN_PASSWORD` (optional), `HOMEBREW_TAP_GITHUB_TOKEN` (pushes formula to [bajpai-labs/homebrew-tap](https://github.com/bajpai-labs/homebrew-tap)).
 
 ### Homebrew
 
 ```bash
-brew tap bajpailabs/tap
+brew tap bajpai-labs/tap
 brew install kyber-pqc
 ```
 
-On each release, CI updates the tap formula, builds an arm64 macOS bottle, and uploads it to GitHub Releases. Create the empty tap repo (`bajpailabs/homebrew-tap` with a `Formula/` folder) before the first tagged release.
+On each release, CI updates the tap formula, builds an arm64 macOS bottle, and uploads it to GitHub Releases.
 
 ### Artifact signing
 
