@@ -146,8 +146,20 @@ jobs:
             gh release upload "${{ github.ref_name }}" "${bottles[@]}" --clobber
           fi
 
+      - name: Check Homebrew tap credentials
+        id: homebrew_tap
+        env:
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+        run: |
+          if [[ -n "${HOMEBREW_TAP_GITHUB_TOKEN}" ]]; then
+            echo "enabled=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+            echo "Skipping tap push: HOMEBREW_TAP_GITHUB_TOKEN not set"
+          fi
+
       - name: Push formula to bajpai-labs/homebrew-tap
-        if: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN != '' }}
+        if: steps.homebrew_tap.outputs.enabled == 'true'
         env:
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
@@ -193,8 +205,20 @@ jobs:
           name: python-dist
           path: dist/*
 
+      - name: Check PyPI credentials
+        id: pypi
+        env:
+          PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          if [[ -n "${PYPI_API_TOKEN}" ]]; then
+            echo "enabled=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+            echo "Skipping PyPI publish: PYPI_API_TOKEN not set"
+          fi
+
       - name: Publish to PyPI
-        if: ${{ secrets.PYPI_API_TOKEN != '' }}
+        if: steps.pypi.outputs.enabled == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
@@ -207,15 +231,27 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - name: Check crates.io credentials
+        id: crates
+        env:
+          CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: |
+          if [[ -n "${CRATES_IO_TOKEN}" ]]; then
+            echo "enabled=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+            echo "Skipping crates.io publish: CRATES_IO_TOKEN not set"
+          fi
+
       - name: Publish kyber-pqc-sys
-        if: ${{ secrets.CRATES_IO_TOKEN != '' }}
+        if: steps.crates.outputs.enabled == 'true'
         working-directory: crates/kyber-pqc-sys
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
         run: cargo publish --allow-dirty --token "$CARGO_REGISTRY_TOKEN"
 
       - name: Publish kyber-pqc
-        if: ${{ secrets.CRATES_IO_TOKEN != '' }}
+        if: steps.crates.outputs.enabled == 'true'
         working-directory: crates/kyber-pqc
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
@@ -224,7 +260,6 @@ jobs:
   bajpai-conan:
     name: Conan (${{ matrix.arch }})
     needs: test
-    if: ${{ secrets.BAJPAILABS_REGISTRY_USER != '' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -241,19 +276,36 @@ jobs:
     env:
       CONAN_URL: https://conan.bajpailabs.com
     steps:
+      - name: Check Bajpai registry credentials
+        id: registry
+        env:
+          BAJPAILABS_REGISTRY_USER: ${{ secrets.BAJPAILABS_REGISTRY_USER }}
+        run: |
+          if [[ -n "${BAJPAILABS_REGISTRY_USER}" ]]; then
+            echo "enabled=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+            echo "Skipping Conan publish: BAJPAILABS_REGISTRY_USER not set"
+          fi
+
       - uses: actions/checkout@v4
+        if: steps.registry.outputs.enabled == 'true'
 
       - uses: actions/setup-python@v5
+        if: steps.registry.outputs.enabled == 'true'
         with:
           python-version: "3.12"
 
       - name: Install Conan
+        if: steps.registry.outputs.enabled == 'true'
         run: pip install conan
 
       - name: Detect Conan profile
+        if: steps.registry.outputs.enabled == 'true'
         run: conan profile detect --force
 
       - name: Create and upload Conan package
+        if: steps.registry.outputs.enabled == 'true'
         shell: bash
         env:
           BAJPAILABS_REGISTRY_USER: ${{ secrets.BAJPAILABS_REGISTRY_USER }}
@@ -267,12 +319,25 @@ jobs:
 
   bajpai-docker:
     needs: test
-    if: ${{ secrets.BAJPAILABS_REGISTRY_USER != '' }}
     runs-on: ubuntu-latest
     steps:
+      - name: Check Bajpai registry credentials
+        id: registry
+        env:
+          BAJPAILABS_REGISTRY_USER: ${{ secrets.BAJPAILABS_REGISTRY_USER }}
+        run: |
+          if [[ -n "${BAJPAILABS_REGISTRY_USER}" ]]; then
+            echo "enabled=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+            echo "Skipping Docker publish: BAJPAILABS_REGISTRY_USER not set"
+          fi
+
       - uses: actions/checkout@v4
+        if: steps.registry.outputs.enabled == 'true'
 
       - name: Log in to Bajpai Docker registry
+        if: steps.registry.outputs.enabled == 'true'
         uses: docker/login-action@v3
         with:
           registry: docker.bajpailabs.com
@@ -280,6 +345,7 @@ jobs:
           password: ${{ secrets.BAJPAILABS_REGISTRY_PASSWORD }}
 
       - name: Build and push container image
+        if: steps.registry.outputs.enabled == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -290,43 +356,73 @@ jobs:
 
   bajpai-raw:
     needs: [build-assets, pypi, github-release]
-    if: ${{ secrets.BAJPAILABS_REGISTRY_USER != '' }}
     runs-on: ubuntu-latest
     env:
       RAW_URL: https://raw.bajpailabs.com
     steps:
+      - name: Check Bajpai registry credentials
+        id: registry
+        env:
+          BAJPAILABS_REGISTRY_USER: ${{ secrets.BAJPAILABS_REGISTRY_USER }}
+        run: |
+          if [[ -n "${BAJPAILABS_REGISTRY_USER}" ]]; then
+            echo "enabled=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+            echo "Skipping Raw publish: BAJPAILABS_REGISTRY_USER not set"
+          fi
+
       - uses: actions/checkout@v4
+        if: steps.registry.outputs.enabled == 'true'
 
       - uses: actions/download-artifact@v4
+        if: steps.registry.outputs.enabled == 'true'
         with:
           path: dist
           merge-multiple: true
 
       - uses: actions/download-artifact@v4
+        if: steps.registry.outputs.enabled == 'true'
         with:
           name: python-dist
           path: dist/python
         continue-on-error: true
 
       - name: Install Syft
+        if: steps.registry.outputs.enabled == 'true'
         run: |
           curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
             | sh -s -- -b /usr/local/bin
 
       - name: Generate SBOM (SPDX)
+        if: steps.registry.outputs.enabled == 'true'
         run: syft . -o spdx-json > sbom.spdx.json
 
       - name: Generate SBOM (CycloneDX)
+        if: steps.registry.outputs.enabled == 'true'
         run: syft . -o cyclonedx-json > cyclonedx.json
 
+      - name: Check minisign credentials
+        id: minisign
+        if: steps.registry.outputs.enabled == 'true'
+        env:
+          MINISIGN_KEY: ${{ secrets.MINISIGN_KEY }}
+        run: |
+          if [[ -n "${MINISIGN_KEY}" ]]; then
+            echo "enabled=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+            echo "Skipping artifact signing: MINISIGN_KEY not set"
+          fi
+
       - name: Install minisign
-        if: ${{ secrets.MINISIGN_KEY != '' }}
+        if: steps.registry.outputs.enabled == 'true' && steps.minisign.outputs.enabled == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y minisign
 
       - name: Sign release tarballs
-        if: ${{ secrets.MINISIGN_KEY != '' }}
+        if: steps.registry.outputs.enabled == 'true' && steps.minisign.outputs.enabled == 'true'
         env:
           MINISIGN_KEY: ${{ secrets.MINISIGN_KEY }}
           MINISIGN_PASSWORD: ${{ secrets.MINISIGN_PASSWORD }}
@@ -353,11 +449,13 @@ jobs:
           rm -f minisign.key
 
       - name: Generate SHA256SUMS
+        if: steps.registry.outputs.enabled == 'true'
         run: |
           shopt -s nullglob
           (cd dist && sha256sum *.tar.gz > SHA256SUMS)
 
       - name: Upload to Raw registry
+        if: steps.registry.outputs.enabled == 'true'
         env:
           BAJPAILABS_REGISTRY_USER: ${{ secrets.BAJPAILABS_REGISTRY_USER }}
           BAJPAILABS_REGISTRY_PASSWORD: ${{ secrets.BAJPAILABS_REGISTRY_PASSWORD }}
@@ -387,6 +485,7 @@ jobs:
           done
 
       - name: Upload SBOM and signatures to GitHub Release
+        if: steps.registry.outputs.enabled == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
