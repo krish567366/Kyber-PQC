@@ -29,6 +29,7 @@ test_package/CMakeUserPresets.json
 # Rust
 /target/
 Cargo.lock
+crates/kyber-pqc-sys/c/
 
 # CMake
 /c/build/

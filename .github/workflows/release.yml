@@ -129,11 +129,15 @@ jobs:
           TAG: ${{ github.ref_name }}
           REPO: ${{ github.repository }}
         run: |
-          FORMULA="${GITHUB_WORKSPACE}/homebrew-tap/Formula/kyber-pqc.rb"
+          TAP_PATH="$(brew --repo local/kyber-pqc)"
+          mkdir -p "${TAP_PATH}/Formula"
+          cp homebrew-tap/Formula/kyber-pqc.rb "${TAP_PATH}/Formula/kyber-pqc.rb"
+          brew tap local/kyber-pqc 2>/dev/null || true
           ROOT_URL="https://github.com/${REPO}/releases/download/${TAG}"
-          brew install --build-bottle --formula "${FORMULA}"
+          brew install --build-bottle local/kyber-pqc/kyber-pqc
           brew bottle --json --root-url="${ROOT_URL}" kyber-pqc > bottle.json
           brew bottle --merge --write bottle.json
+          cp "${TAP_PATH}/Formula/kyber-pqc.rb" homebrew-tap/Formula/kyber-pqc.rb
 
       - name: Upload bottle to GitHub Release
         shell: bash
@@ -148,6 +152,7 @@ jobs:
 
       - name: Check Homebrew tap credentials
         id: homebrew_tap
+        shell: bash
         env:
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
         run: |
@@ -207,6 +212,7 @@ jobs:
 
       - name: Check PyPI credentials
         id: pypi
+        shell: bash
         env:
           PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
         run: |
@@ -221,6 +227,7 @@ jobs:
         if: steps.pypi.outputs.enabled == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
+          user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
 
   crates-io:
@@ -233,6 +240,7 @@ jobs:
 
       - name: Check crates.io credentials
         id: crates
+        shell: bash
         env:
           CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
         run: |
@@ -242,6 +250,16 @@ jobs:
             echo "enabled=false" >> "${GITHUB_OUTPUT}"
             echo "Skipping crates.io publish: CRATES_IO_TOKEN not set"
           fi
+
+      - name: Vendor C sources for crates.io
+        if: steps.crates.outputs.enabled == 'true'
+        run: |
+          mkdir -p crates/kyber-pqc-sys/c
+          cp -R c/src c/include c/vendor crates/kyber-pqc-sys/c/
+
+      - name: Verify crate package
+        if: steps.crates.outputs.enabled == 'true'
+        run: cargo publish -p kyber-pqc-sys --dry-run --allow-dirty
 
       - name: Publish kyber-pqc-sys
         if: steps.crates.outputs.enabled == 'true'
@@ -278,6 +296,7 @@ jobs:
     steps:
       - name: Check Bajpai registry credentials
         id: registry
+        shell: bash
         env:
           BAJPAILABS_REGISTRY_USER: ${{ secrets.BAJPAILABS_REGISTRY_USER }}
         run: |
@@ -323,6 +342,7 @@ jobs:
     steps:
       - name: Check Bajpai registry credentials
         id: registry
+        shell: bash
         env:
           BAJPAILABS_REGISTRY_USER: ${{ secrets.BAJPAILABS_REGISTRY_USER }}
         run: |
@@ -362,6 +382,7 @@ jobs:
     steps:
       - name: Check Bajpai registry credentials
         id: registry
+        shell: bash
         env:
           BAJPAILABS_REGISTRY_USER: ${{ secrets.BAJPAILABS_REGISTRY_USER }}
         run: |
@@ -405,6 +426,7 @@ jobs:
       - name: Check minisign credentials
         id: minisign
         if: steps.registry.outputs.enabled == 'true'
+        shell: bash
         env:
           MINISIGN_KEY: ${{ secrets.MINISIGN_KEY }}
         run: |

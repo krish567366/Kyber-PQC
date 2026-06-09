@@ -1,6 +1,15 @@
 [package]
 name = "kyber-pqc-sys"
 version.workspace = true
+include = [
+    "build.rs",
+    "src/**/*",
+    "c/src/**/*.c",
+    "c/src/**/*.h",
+    "c/include/**/*.h",
+    "c/vendor/**/*.c",
+    "c/vendor/**/*.h",
+]
 edition.workspace = true
 license.workspace = true
 authors.workspace = true

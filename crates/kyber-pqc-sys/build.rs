@@ -1,9 +1,18 @@
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+fn c_root(manifest_dir: &Path) -> PathBuf {
+    let vendored = manifest_dir.join("c");
+    if vendored.join("src/kyber_pqc.c").exists() {
+        vendored
+    } else {
+        manifest_dir.join("../../c")
+    }
+}
 
 fn main() {
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    let c_root = manifest_dir.join("../../c");
+    let c_root = c_root(&manifest_dir);
 
     let sources = [
         "src/kyber_pqc.c",
@@ -33,8 +42,9 @@ fn main() {
         .flag_if_supported("-Wextra");
 
     for source in sources {
-        build.file(c_root.join(source));
-        println!("cargo:rerun-if-changed={}", c_root.join(source).display());
+        let path = c_root.join(source);
+        build.file(&path);
+        println!("cargo:rerun-if-changed={}", path.display());
     }
 
     build.compile("kyber_pqc");
