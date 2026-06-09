@@ -17,7 +17,7 @@ pip install kyber-pqc
 |---------|---------|
 | PyPI | `pip install kyber-pqc` |
 | Conan | `conan install kyber-pqc/2.1.1 -r bajpai` |
-| Docker | `docker pull docker.bajpailabs.com/kyber-pqc:latest` |
+| Docker | `docker pull docker.bajpailabs.com/repository/bajpailabs-docker/kyber-pqc:latest` |
 | Raw | `raw.bajpailabs.com/kyber-pqc/v2.1.1/…` |
 | Go | `go get github.com/krish567366/Kyber-PQC/go/kyberpqc@v2.1.1` |
 | Rust | `cargo add kyber-pqc` |

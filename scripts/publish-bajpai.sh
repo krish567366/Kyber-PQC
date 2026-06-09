@@ -20,6 +20,8 @@ cd "$ROOT"
 CONAN_REMOTE="${CONAN_REMOTE:-bajpai}"
 CONAN_URL="${CONAN_URL:-https://conan.bajpailabs.com}"
 DOCKER_REGISTRY="${DOCKER_REGISTRY:-docker.bajpailabs.com}"
+DOCKER_REPO="${DOCKER_REPO:-repository/bajpailabs-docker}"
+DOCKER_IMAGE="${DOCKER_REGISTRY}/${DOCKER_REPO}/kyber-pqc"
 RAW_URL="${RAW_URL:-https://raw.bajpailabs.com}"
 
 if [[ -z "${BAJPAILABS_REGISTRY_USER:-}" || -z "${BAJPAILABS_REGISTRY_PASSWORD:-}" ]]; then
@@ -42,10 +44,10 @@ conan upload "kyber-pqc/*" -r "${CONAN_REMOTE}" --confirm
 echo "==> Docker → ${DOCKER_REGISTRY}"
 echo "${BAJPAILABS_REGISTRY_PASSWORD}" | docker login "${DOCKER_REGISTRY}" \
   -u "${BAJPAILABS_REGISTRY_USER}" --password-stdin
-docker build -t "${DOCKER_REGISTRY}/kyber-pqc:${VERSION}" \
-             -t "${DOCKER_REGISTRY}/kyber-pqc:latest" .
-docker push "${DOCKER_REGISTRY}/kyber-pqc:${VERSION}"
-docker push "${DOCKER_REGISTRY}/kyber-pqc:latest"
+docker build -t "${DOCKER_IMAGE}:${VERSION}" \
+             -t "${DOCKER_IMAGE}:latest" .
+docker push "${DOCKER_IMAGE}:${VERSION}"
+docker push "${DOCKER_IMAGE}:latest"
 
 if compgen -G "dist/*.tar.gz" > /dev/null; then
   echo "==> Raw → ${RAW_URL}/kyber-pqc/${TAG}/"

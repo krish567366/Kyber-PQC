@@ -353,6 +353,10 @@ jobs:
   bajpai-docker:
     needs: test
     runs-on: ubuntu-latest
+    env:
+      DOCKER_REGISTRY: docker.bajpailabs.com
+      # Nexus Docker hosted repo (matches bajpailabs-conan / bajpailabs-raw naming).
+      DOCKER_REPO: repository/bajpailabs-docker
     steps:
       - name: Check Bajpai registry credentials
         id: registry
@@ -374,7 +378,7 @@ jobs:
         if: steps.registry.outputs.enabled == 'true'
         uses: docker/login-action@v3
         with:
-          registry: docker.bajpailabs.com
+          registry: ${{ env.DOCKER_REGISTRY }}
           username: ${{ secrets.BAJPAILABS_REGISTRY_USER }}
           password: ${{ secrets.BAJPAILABS_REGISTRY_PASSWORD }}
 
@@ -384,9 +388,12 @@ jobs:
         with:
           context: .
           push: true
+          # Nexus does not accept BuildKit provenance/SBOM attestations.
+          provenance: false
+          sbom: false
           tags: |
-            docker.bajpailabs.com/kyber-pqc:latest
-            docker.bajpailabs.com/kyber-pqc:${{ github.ref_name }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPO }}/kyber-pqc:latest
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPO }}/kyber-pqc:${{ github.ref_name }}
 
   bajpai-raw:
     needs: [build-assets, pypi, github-release]

@@ -41,6 +41,8 @@ conan-create:
 CONAN_REMOTE ?= bajpai
 CONAN_URL ?= https://conan.bajpailabs.com
 DOCKER_REGISTRY ?= docker.bajpailabs.com
+DOCKER_REPO ?= repository/bajpailabs-docker
+DOCKER_IMAGE ?= $(DOCKER_REGISTRY)/$(DOCKER_REPO)/kyber-pqc
 
 conan-remote:
 	conan remote add $(CONAN_REMOTE) $(CONAN_URL) --force
@@ -58,8 +60,8 @@ docker-push-bajpai: docker-build
 	@test -n "$(BAJPAILABS_REGISTRY_USER)" || (echo "Set BAJPAILABS_REGISTRY_USER" && exit 1)
 	echo "$(BAJPAILABS_REGISTRY_PASSWORD)" | docker login $(DOCKER_REGISTRY) \
 		-u "$(BAJPAILABS_REGISTRY_USER)" --password-stdin
-	docker tag kyber-pqc:local $(DOCKER_REGISTRY)/kyber-pqc:latest
-	docker push $(DOCKER_REGISTRY)/kyber-pqc:latest
+	docker tag kyber-pqc:local $(DOCKER_IMAGE):latest
+	docker push $(DOCKER_IMAGE):latest
 
 brew-test:
 	cmake -S c -B c/build -DCMAKE_BUILD_TYPE=Release -DPROJECT_VERSION=2.1.1
