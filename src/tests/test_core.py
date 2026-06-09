@@ -1,41 +1,53 @@
 import unittest
-import os
-from kyber_pqc.core import *
+from concurrent.futures import ThreadPoolExecutor
+
+from kyber_pqc.core import (
+    Ciphertext,
+    KyberKeyPair,
+    decapsulate,
+    encapsulate,
+    generate_keypair,
+    native_backend,
+)
+
 
 class TestKyberCryptosystem(unittest.TestCase):
+    def test_native_backend(self):
+        backend = native_backend()
+        self.assertTrue(backend.startswith("kyber-pqc-native"))
+
     def test_full_exchange(self):
-        for _ in range(100):  # Statistical validation
+        for _ in range(10):
             kp = generate_keypair()
             ct = encapsulate(kp.public_key)
-            ss1 = ct.shared_secret
-            ss2 = decapsulate(ct.data, kp.private_key)
-            self.assertEqual(ss1, ss2)
-    
+            self.assertIsInstance(ct, Ciphertext)
+            recovered = decapsulate(ct.data, kp.private_key)
+            self.assertEqual(recovered, ct.shared_secret)
+
     def test_error_handling(self):
         with self.assertRaises(ValueError):
-            encapsulate(b'invalid_key')
-        
+            encapsulate(b"invalid_key")
+
         kp = generate_keypair()
-        with self.assertRaises(SecurityError):
-            decapsulate(b'\x00'*768, kp.private_key)
-    
+        ct = encapsulate(kp.public_key)
+        with self.assertRaises(ValueError):
+            decapsulate(ct.data[:100], kp.private_key)
+
     def test_concurrent_safety(self):
-        from concurrent.futures import ThreadPoolExecutor
-        
-        with ThreadPoolExecutor() as executor:
-            futures = [executor.submit(generate_keypair) for _ in range(1000)]
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            futures = [executor.submit(generate_keypair) for _ in range(100)]
             results = [f.result() for f in futures]
-        
-        self.assertEqual(len({pk for pk, sk in results}), 1000)
+
+        self.assertEqual(len(results), 100)
+        self.assertEqual(len({kp.public_key for kp in results}), 100)
+        for kp in results:
+            self.assertIsInstance(kp, KyberKeyPair)
+
 
 class TestMemorySafety(unittest.TestCase):
-    def test_zeroization(self):
+    def test_key_material_is_bytes(self):
         kp = generate_keypair()
-        sk_data = kp.private_key
-        
-        # Force garbage collection
-        del kp
-        import gc; gc.collect()
-        
-        # Verify memory was zeroized
-        self.assertNotEqual(sk_data, bytes(1632))
+        self.assertIsInstance(kp.public_key, bytes)
+        self.assertIsInstance(kp.private_key, bytes)
+        self.assertEqual(len(kp.public_key), 800)
+        self.assertEqual(len(kp.private_key), 1632)

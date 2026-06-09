@@ -6,6 +6,14 @@
 # Build artifacts
 __pycache__/
 *.so
+c/build/
+c/src/*.o
+c/vendor/kyber512/*.o
+c/tests/test_kyber
+c/tests/test_pem
+c/examples/demo
+src/kyber_pqc/_native*.so
+src/kyber_pqc/_native*.pyd
 *.pyc
 *.pyo
 *.pyd

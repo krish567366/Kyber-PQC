@@ -1,94 +1,106 @@
 """
-High-Performance Benchmarking Framework
-
-Features:
-- NUMA-aware process pinning
-- Statistical significance analysis
-- Thermal throttling detection
+Throughput benchmarking for Kyber-512 operations.
 """
 
-import time
 import statistics
-import multiprocessing
-from functools import partial
-from typing import Dict
+import time
+from typing import Callable, Dict, List, Sequence, TypeVar
 
-WARMUP_ITERATIONS = 1000
+from .core import decapsulate, encapsulate, generate_keypair
+
+WARMUP_ITERATIONS = 10
 CONFIDENCE_LEVEL = 0.99
+T = TypeVar("T")
 
-def benchmark_throughput(operations: int) -> Dict[str, float]:
+
+def benchmark_throughput(operations: int) -> Dict[str, Dict[str, float]]:
     """
-    Multi-core throughput analysis with statistical validation
-    
+    Measure key generation, encapsulation, and decapsulation throughput.
+
     Returns:
-        Dictionary with operations/second and 99% confidence intervals
+        Dictionary with mean operations/second and confidence intervals.
     """
-    # NUMA-aware process allocation
-    process_count = min(multiprocessing.cpu_count(), operations//1000)
-    ctx = multiprocessing.get_context('forkserver')
-    
-    with ctx.Pool(process_count) as pool:
-        # Key Generation Benchmark
-        kg_times = _time_operation(
-            pool, 
-            generate_keypair, 
-            operations,
-            process_count
-        )
-        
-        # Encapsulation Benchmark
-        pk_list = [kp.public_key for kp in generate_keypair_batch(operations)]
-        enc_times = _time_operation(
-            pool,
-            encapsulate,
-            operations,
-            process_count,
-            pk_list
-        )
-        
-        # Decapsulation Benchmark
-        ct_list = [encapsulate(pk) for pk in pk_list]
-        sk_list = [kp.private_key for kp in generate_keypair_batch(operations)]
-        dec_times = _time_operation(
-            pool,
-            decapsulate,
-            operations,
-            process_count,
-            ct_list,
-            sk_list
-        )
-    
+    if operations < 1:
+        raise ValueError("operations must be at least 1")
+
+    keypairs = [generate_keypair() for _ in range(operations)]
+    public_keys = [kp.public_key for kp in keypairs]
+    ciphertexts = [encapsulate(pk) for pk in public_keys]
+
     return {
-        'keygen': _analyze_results(kg_times),
-        'encaps': _analyze_results(enc_times),
-        'decaps': _analyze_results(dec_times)
+        "keygen": _analyze_results(
+            _time_operation(generate_keypair, operations)
+        ),
+        "encaps": _analyze_results(
+            _time_operation(
+                lambda pk: encapsulate(pk),
+                operations,
+                public_keys,
+            )
+        ),
+        "decaps": _analyze_results(
+            _time_operation(
+                lambda ct, sk: decapsulate(ct.data, sk),
+                operations,
+                list(
+                    zip(
+                        ciphertexts,
+                        [kp.private_key for kp in keypairs],
+                    )
+                ),
+            )
+        ),
     }
 
-def _time_operation(pool, func, ops, workers, *args):
-    """Precision timing with cache warmup and outlier removal"""
-    # JIT warmup
-    for _ in range(WARMUP_ITERATIONS):
-        func(*[a[0] for a in args] if args else None)
-    
-    # Batch processing with load balancing
-    chunk_size = max(1, ops // (workers * 4))
-    tasks = [args[i::chunk_size] for i in range(chunk_size)]
-    
-    timings = []
-    for _ in range(5):  # 5 trials for statistical significance
-        start = time.perf_counter_ns()
-        pool.starmap(func, tasks)
-        timings.append((time.perf_counter_ns() - start) / 1e9)
-    
-    return _remove_outliers(timings)
 
-def _analyze_results(times):
-    """Compute throughput with confidence intervals"""
-    mean = statistics.mean(times)
-    stdev = statistics.stdev(times)
+def _time_operation(
+    func: Callable[..., T],
+    operations: int,
+    inputs: Sequence = (),
+) -> List[float]:
+    """Return per-operation durations in seconds."""
+    for _ in range(WARMUP_ITERATIONS):
+        if inputs:
+            item = inputs[0]
+            if isinstance(item, tuple):
+                func(*item)
+            else:
+                func(item)
+        else:
+            func()
+
+    durations: List[float] = []
+    if inputs:
+        for item in inputs:
+            item_start = time.perf_counter()
+            if isinstance(item, tuple):
+                func(*item)
+            else:
+                func(item)
+            durations.append(time.perf_counter() - item_start)
+    else:
+        for _ in range(operations):
+            item_start = time.perf_counter()
+            func()
+            durations.append(time.perf_counter() - item_start)
+
+    return durations
+
+
+def _analyze_results(durations: Sequence[float]) -> Dict[str, float]:
+    """Compute throughput with a confidence interval."""
+    if not durations:
+        return {"mean_ops": 0.0, "confidence_interval": 0.0}
+
+    mean_duration = statistics.mean(durations)
+    if len(durations) < 2:
+        return {"mean_ops": 1 / mean_duration, "confidence_interval": 0.0}
+
+    stdev = statistics.stdev(durations)
     ci = statistics.NormalDist().inv_cdf((1 + CONFIDENCE_LEVEL) / 2)
-    
+    margin = (ci * stdev) / (len(durations) ** 0.5)
+
     return {
-        'mean_ops': 1 / mean,
-        'confidence_interval': (ci * stdev) / (len(times) ** 0.5)
+        "mean_ops": 1 / mean_duration,
+        "confidence_interval": margin / mean_duration,
     }

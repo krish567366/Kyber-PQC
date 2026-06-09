@@ -1,123 +1,80 @@
 """
-Kyber-PQC Core Module: Hardware-Optimized Post-Quantum Cryptography
+Kyber-PQC Core Module: Native ML-KEM-512 implementation.
 
-Implements NIST-approved Kyber-512 KEM with:
-- AVX2-accelerated polynomial arithmetic
-- Constant-time memory-safe operations
-- NUMA-aware concurrent execution
+All cryptographic operations execute in the compiled C extension built from
+the in-tree Kyber-512 reference core (not third-party Python wrappers).
 """
 
-import os
-import sys
-import ctypes
-from typing import NamedTuple, Tuple
-from multiprocessing import cpu_count
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.backends import default_backend
+from typing import NamedTuple
 
-# Load optimized C library
-_base_dir = os.path.abspath(os.path.dirname(__file__))
-_kyber = ctypes.CDLL(os.path.join(_base_dir, '_accelerated.so'))
+from . import _native
+
+PUBLIC_KEY_BYTES = 800
+PRIVATE_KEY_BYTES = 1632
+CIPHERTEXT_BYTES = 768
+SHARED_SECRET_BYTES = 32
+
+
+class SecurityError(Exception):
+    """Raised when a cryptographic integrity check fails."""
+
 
 class KyberKeyPair(NamedTuple):
-    """
-    Memory-aligned key pair structure (cache-line optimized)
-    
-    public_key: 768-byte compressed polynomial
-    private_key: 1632-byte secret parameters
-    """
+    """Kyber-512 key pair."""
+
     public_key: bytes
     private_key: bytes
 
+
 class Ciphertext(NamedTuple):
-    """
-    IND-CCA2 secure ciphertext with integrated MAC
-    
-    data: 768-byte ciphertext
-    shared_secret: 256-bit session key
-    """
+    """Kyber-512 ciphertext with derived shared secret."""
+
     data: bytes
     shared_secret: bytes
 
+
+def native_backend() -> str:
+    """Return the active native implementation backend."""
+    return str(_native.backend_name())
+
+
 def generate_keypair() -> KyberKeyPair:
-    """
-    Thread-safe key generation using hardware-accelerated RNG
-    
-    Utilizes:
-    - AES-256 CTR_DRBG with RDSEED fallback
-    - Memory protection with mlock(2)
-    - Cache-line aligned buffers (64-byte boundary)
-    """
-    pk_buf = ctypes.create_string_buffer(768)
-    sk_buf = ctypes.create_string_buffer(1632)
-    
-    # Use C extension for hardware acceleration
-    _kyber.kyber512_keypair(pk_buf, sk_buf)
-    
-    return KyberKeyPair(
-        bytes(pk_buf.raw),
-        bytes(sk_buf.raw)
-    )
+    """Generate a new Kyber-512 key pair."""
+    public_key, private_key = _native.keypair()
+    return KyberKeyPair(public_key, private_key)
+
 
 def encapsulate(public_key: bytes) -> Ciphertext:
-    """
-    Constant-time encapsulation with side-channel resistance
-    
-    Features:
-    - Double-blind polynomial multiplication
-    - Cache-oblivious hashing
-    - Branchless control flow
-    """
-    if len(public_key) != 768:
-        raise ValueError("Invalid public key length")
-    
-    ct_buf = ctypes.create_string_buffer(768)
-    ss_buf = ctypes.create_string_buffer(32)
-    
-    _kyber.kyber512_enc(
-        ct_buf,
-        ss_buf,
-        ctypes.c_char_p(public_key)
-    )
-    
-    return Ciphertext(
-        bytes(ct_buf.raw),
-        bytes(ss_buf.raw)
-    )
-class SecureAllocator(ctypes.Structure):
-    """Page-aligned memory with mlock protection"""
-    _fields_ = [("buffer", ctypes.c_char_p),
-                ("size", ctypes.c_size_t)]
-    
-    def __init__(self, size):
-        self.buffer = ctypes.c_char_p(os.urandom(size))
-        libc.mlock(self.buffer, size)
-    
-    def __del__(self):
-        libc.munlock(self.buffer, self.size)
-        libc.explicit_bzero(self.buffer, self.size)
+    """Encapsulate a shared secret against a Kyber-512 public key."""
+    if len(public_key) != PUBLIC_KEY_BYTES:
+        raise ValueError(
+            "Invalid public key length: "
+            f"expected {PUBLIC_KEY_BYTES}, got {len(public_key)}"
+        )
+
+    ciphertext, shared_secret = _native.encapsulate(public_key)
+    return Ciphertext(ciphertext, shared_secret)
+
 
 def decapsulate(ciphertext: bytes, private_key: bytes) -> bytes:
-    """
-    Fault-tolerant decapsulation with triple redundancy
-    
-    Security measures:
-    - Memory attestation before operation
-    - Constant-time comparison
-    - Automatic zeroization on error
-    """
-    if len(ciphertext) != 768 or len(private_key) != 1632:
-        raise ValueError("Invalid input lengths")
-    
-    ss_buf = ctypes.create_string_buffer(32)
-    
-    result = _kyber.kyber512_dec(
-        ss_buf,
-        ctypes.c_char_p(ciphertext),
-        ctypes.c_char_p(private_key)
-    )
-    
-    if result != 0:
-        raise SecurityError("Decapsulation failed integrity check")
-    
-    return bytes(ss_buf.raw)
+    """Recover the shared secret from a ciphertext and private key."""
+    if len(ciphertext) != CIPHERTEXT_BYTES:
+        raise ValueError(
+            "Invalid ciphertext length: "
+            f"expected {CIPHERTEXT_BYTES}, got {len(ciphertext)}"
+        )
+    if len(private_key) != PRIVATE_KEY_BYTES:
+        raise ValueError(
+            "Invalid private key length: "
+            f"expected {PRIVATE_KEY_BYTES}, got {len(private_key)}"
+        )
+
+    try:
+        shared_secret = _native.decapsulate(ciphertext, private_key)
+    except RuntimeError as exc:
+        raise SecurityError("Decapsulation failed integrity check") from exc
+
+    if len(shared_secret) != SHARED_SECRET_BYTES:
+        raise SecurityError("Decapsulation produced an invalid shared secret")
+
+    return shared_secret

@@ -1,20 +1,22 @@
 # Kyber-PQC: Quantum-Resistant Cryptography Implementation
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/yourorg/kyber-pqc/ci.yml?branch=main)](https://github.com/krish567366/Kyber-PQC/actions)
-[![Coverage](https://img.shields.io/codecov/c/github/yourorg/kyber-pqc)](https://codecov.io/gh/yourorg/kyber-pqc)
+**Homepage:** [quantum.postquantumlabs.in/kyber-pqc](https://quantum.postquantumlabs.in/kyber-pqc)  
+**Documentation:** [quantum.postquantumlabs.in/docs/kyber-pqc](https://quantum.postquantumlabs.in/docs/kyber-pqc)  
+**Author:** Bajpai Labs · [hello@bajpailabs.com](mailto:hello@bajpailabs.com)
+
+[![Build Status](https://img.shields.io/github/actions/workflow/status/krish567366/Kyber-PQC/ci.yml?branch=main)](https://github.com/krish567366/Kyber-PQC/actions)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-NIST-standardized Kyber-512 Key Encapsulation Mechanism (KEM) implementation with hardware-accelerated performance and military-grade security.
+Native **ML-KEM-512 (Kyber-512)** implementation in C, with Python and Go bindings
+to the same compiled core — not third-party library wrappers.
 
 ## Features
 
-- **AVX2-accelerated** polynomial arithmetic (4x faster than reference)
-- **Constant-time operations** resistant to timing attacks
-- **NUMA-aware** multi-core execution
-- **Zero-copy** memory management
-- **FIPS 140-3** compliant memory protection
-- **NIST STS-validated** randomness
-- **<1ms** latency (99th percentile)
+- **Native C core** compiled at `-O3` with architecture-specific tuning
+- **Python C extension** (`kyber_pqc._native`) — no `kyber-py` dependency
+- **Go cgo bindings** to the same static library — no `circl` dependency
+- **Secure zeroization** of sensitive stack buffers after decapsulation
+- **Hex PEM** key/ciphertext serialization across all language bindings
 
 ## Installation
 
@@ -25,12 +27,24 @@ pip install kyber-pqc
 
 ### Development
 ```bash
-git clone https://github.com/yourorg/kyber-pqc
-cd kyber-pqc
+git clone https://github.com/krish567366/Kyber-PQC
+cd Kyber-PQC
 make install  # Installs with development dependencies
 ```
 
+## Implementations
+
+| Language | Path | PEM support |
+|----------|------|-------------|
+| Python | `src/kyber_pqc/` | `encode_pem`, `write_pem_file` |
+| C | `c/` | `kyber_pem_encode`, `kyber_pem_write_file` |
+| Go | `go/kyberpqc/` | `EncodePEM`, `WritePEMFile` |
+
+Hex PEM format details: [docs/pem_format.md](docs/pem_format.md)
+
 ## Usage
+
+### Python
 
 ```python
 from kyber_pqc import generate_keypair, encapsulate, decapsulate
@@ -44,6 +58,29 @@ shared_secret = decapsulate(ct.data, alice_kp.private_key)
 from kyber_pqc.benchmark import benchmark_throughput
 results = benchmark_throughput(100_000)
 print(f"Throughput: {results['encaps']['mean_ops']:.0f} ops/sec")
+```
+
+### C
+
+```bash
+make -C c test
+./c/examples/demo
+```
+
+### Go
+
+```bash
+cd go && go test ./...
+go run ./examples/demo
+```
+
+### Hex PEM
+
+```python
+from kyber_pqc import generate_keypair, PEMKind, write_pem_file
+
+kp = generate_keypair()
+write_pem_file("private.hex.pem", PEMKind.PRIVATE_KEY, kp.private_key)
 ```
 
 ## Performance Benchmarks
@@ -98,12 +135,12 @@ MIT License - See [LICENSE](LICENSE) for details
 
 ## Documentation
 
-Full API reference and architecture details available in [docs/](docs/):
+Full API reference and architecture details: [quantum.postquantumlabs.in/docs/kyber-pqc](https://quantum.postquantumlabs.in/docs/kyber-pqc)
+
+In-repo guides:
 
 - [Installation Guide](docs/installation.md)
-- [API Reference](docs/api_reference.md)
-- [Security Model](docs/security.md)
-- [Performance Tuning](docs/performance.md)
+- [Hex PEM Format](docs/pem_format.md)
 
 ---
 
